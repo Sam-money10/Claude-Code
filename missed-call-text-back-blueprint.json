@@ -1,0 +1,358 @@
+{
+  "name": "Automated Missed Call Follow-Up — Instant Text Back",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": null,
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {
+          "parameters": {
+            "hook": {
+              "label": "Missed Call Webhook (Connect your phone system here)"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "hook",
+            "type": "hook:gateway-webhook",
+            "label": "Webhook",
+            "required": true
+          },
+          {
+            "name": "maxResults",
+            "type": "number",
+            "label": "Maximum number of results"
+          }
+        ],
+        "expect": [
+          {
+            "name": "caller_phone",
+            "type": "text",
+            "label": "Caller Phone Number",
+            "required": true
+          },
+          {
+            "name": "caller_name",
+            "type": "text",
+            "label": "Caller Name"
+          },
+          {
+            "name": "call_time",
+            "type": "text",
+            "label": "Call Timestamp"
+          },
+          {
+            "name": "call_status",
+            "type": "text",
+            "label": "Call Status (missed, no-answer, busy)"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 3,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "sms_body": "{{if(1.caller_name; \"Hi \" + 1.caller_name + \", \"; \"Hi there, \")}}we noticed we just missed your call! We didn't want you to wait — how can we help you today?\n\nFeel free to reply to this text or let us know a good time to call you back.\n\nThanks!\n{{formatDate(now; \"hh:mm A\")}}",
+                "caller_phone": "{{1.caller_phone}}",
+                "caller_name": "{{if(1.caller_name; 1.caller_name; \"Unknown Caller\")}}",
+                "call_time": "{{if(1.call_time; 1.call_time; formatDate(now; \"YYYY-MM-DD HH:mm:ss\"))}}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": -200,
+                  "name": "Prepare SMS Message"
+                },
+                "expect": [
+                  {
+                    "name": "sms_body",
+                    "type": "text",
+                    "label": "SMS Body"
+                  },
+                  {
+                    "name": "caller_phone",
+                    "type": "text",
+                    "label": "Phone"
+                  },
+                  {
+                    "name": "caller_name",
+                    "type": "text",
+                    "label": "Name"
+                  },
+                  {
+                    "name": "call_time",
+                    "type": "text",
+                    "label": "Call Time"
+                  }
+                ]
+              }
+            },
+            {
+              "id": 4,
+              "module": "twilio:sendSMS",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "from": "YOUR_TWILIO_PHONE_NUMBER",
+                "to": "{{3.caller_phone}}",
+                "body": "{{3.sms_body}}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": -200,
+                  "name": "Send Instant Text Back (Twilio)"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Twilio Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:twilio",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ],
+                "expect": [
+                  {
+                    "name": "from",
+                    "type": "text",
+                    "label": "From (Your Twilio Number)",
+                    "required": true
+                  },
+                  {
+                    "name": "to",
+                    "type": "text",
+                    "label": "To (Caller Phone)",
+                    "required": true
+                  },
+                  {
+                    "name": "body",
+                    "type": "text",
+                    "label": "Message Body",
+                    "required": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": 7,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "delay_minutes": 5
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": -200,
+                  "name": "Wait 5 Minutes Before Logging"
+                },
+                "expect": [
+                  {
+                    "name": "delay_minutes",
+                    "type": "number",
+                    "label": "Delay (minutes)"
+                  }
+                ]
+              }
+            }
+          ],
+          "label": "Missed Call → Send SMS"
+        },
+        {
+          "flow": [
+            {
+              "id": 5,
+              "module": "google-sheets:addRow",
+              "version": 4,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+                "sheetId": "Sheet1",
+                "values": {
+                  "0": "{{1.caller_phone}}",
+                  "1": "{{if(1.caller_name; 1.caller_name; \"Unknown\")}}",
+                  "2": "{{formatDate(now; \"YYYY-MM-DD HH:mm:ss\")}}",
+                  "3": "{{if(1.call_status; 1.call_status; \"missed\")}}",
+                  "4": "Text sent",
+                  "5": "Awaiting reply"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 200,
+                  "name": "Log Lead to Google Sheet"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Google Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:google",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ],
+                "expect": [
+                  {
+                    "name": "spreadsheetId",
+                    "type": "text",
+                    "label": "Spreadsheet ID",
+                    "required": true
+                  },
+                  {
+                    "name": "sheetId",
+                    "type": "text",
+                    "label": "Sheet Name",
+                    "required": true
+                  },
+                  {
+                    "name": "values",
+                    "type": "collection",
+                    "label": "Row Values",
+                    "spec": [
+                      { "name": "0", "label": "A: Phone", "type": "text" },
+                      { "name": "1", "label": "B: Name", "type": "text" },
+                      { "name": "2", "label": "C: Date/Time", "type": "text" },
+                      { "name": "3", "label": "D: Call Status", "type": "text" },
+                      { "name": "4", "label": "E: Action Taken", "type": "text" },
+                      { "name": "5", "label": "F: Follow-Up Status", "type": "text" }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "label": "Log Lead to Sheet"
+        },
+        {
+          "flow": [
+            {
+              "id": 6,
+              "module": "email:ActionSendEmail",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "to": "YOUR_EMAIL@example.com",
+                "subject": "Missed Call Lead: {{if(1.caller_name; 1.caller_name; 1.caller_phone)}}",
+                "content": "<h3>Missed Call Alert</h3><p><strong>Caller:</strong> {{if(1.caller_name; 1.caller_name; \"Unknown\")}}</p><p><strong>Phone:</strong> {{1.caller_phone}}</p><p><strong>Time:</strong> {{formatDate(now; \"MMMM DD, YYYY hh:mm A\")}}</p><p><strong>Status:</strong> {{if(1.call_status; 1.call_status; \"missed\")}}</p><hr><p>An automated text-back has been sent. Follow up if no reply is received within 1 hour.</p>",
+                "ishtml": true
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 500,
+                  "name": "Send Email Notification to You"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Email Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:email",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ],
+                "expect": [
+                  {
+                    "name": "to",
+                    "type": "text",
+                    "label": "To Email",
+                    "required": true
+                  },
+                  {
+                    "name": "subject",
+                    "type": "text",
+                    "label": "Subject",
+                    "required": true
+                  },
+                  {
+                    "name": "content",
+                    "type": "text",
+                    "label": "Body (HTML)",
+                    "required": true
+                  }
+                ]
+              }
+            }
+          ],
+          "label": "Notify You via Email"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com",
+    "notes": "Automated Missed Call Follow-Up: Triggers on missed calls via webhook, sends an instant SMS text-back to the caller, logs the lead to Google Sheets, and sends you an email notification."
+  }
+}
