@@ -1,0 +1,469 @@
+{
+  "name": "Lead Follow-Up — Response Handler (Yes / No Detector)",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": null,
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {
+          "parameters": {
+            "hook": {
+              "label": "Lead Response Webhook (fire when a lead replies to a follow-up)"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "hook",
+            "type": "hook:gateway-webhook",
+            "label": "Webhook",
+            "required": true
+          },
+          {
+            "name": "maxResults",
+            "type": "number",
+            "label": "Maximum number of results"
+          }
+        ],
+        "expect": [
+          {
+            "name": "lead_email",
+            "type": "text",
+            "label": "Lead Email",
+            "required": true
+          },
+          {
+            "name": "lead_phone",
+            "type": "text",
+            "label": "Lead Phone (if SMS reply)"
+          },
+          {
+            "name": "response_text",
+            "type": "text",
+            "label": "Lead's Reply / Response Text",
+            "required": true
+          },
+          {
+            "name": "response_source",
+            "type": "text",
+            "label": "Source (email, sms, form, manual)"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicFeeder",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "response_lower": "{{lower(1.response_text)}}",
+        "is_yes": "{{if(or(contains(lower(1.response_text); \"yes\"); contains(lower(1.response_text); \"let's do it\"); contains(lower(1.response_text); \"lets do it\"); contains(lower(1.response_text); \"let's go\"); contains(lower(1.response_text); \"lets go\"); contains(lower(1.response_text); \"move forward\"); contains(lower(1.response_text); \"go ahead\"); contains(lower(1.response_text); \"sounds good\"); contains(lower(1.response_text); \"i'm in\"); contains(lower(1.response_text); \"im in\"); contains(lower(1.response_text); \"sign me up\"); contains(lower(1.response_text); \"accept\"); contains(lower(1.response_text); \"approved\"); contains(lower(1.response_text); \"let's proceed\"); contains(lower(1.response_text); \"we're ready\"); contains(lower(1.response_text); \"book it\"); contains(lower(1.response_text); \"schedule it\"); contains(lower(1.response_text); \"ready to start\"); contains(lower(1.response_text); \"deal\")); true; false)}}",
+        "is_no": "{{if(or(contains(lower(1.response_text); \"no thank\"); contains(lower(1.response_text); \"not interested\"); contains(lower(1.response_text); \"pass\"); contains(lower(1.response_text); \"decline\"); contains(lower(1.response_text); \"not right now\"); contains(lower(1.response_text); \"not at this time\"); contains(lower(1.response_text); \"can't afford\"); contains(lower(1.response_text); \"too expensive\"); contains(lower(1.response_text); \"went with someone else\"); contains(lower(1.response_text); \"found another\"); contains(lower(1.response_text); \"not going to\"); contains(lower(1.response_text); \"decided against\"); contains(lower(1.response_text); \"no longer need\"); contains(lower(1.response_text); \"cancel\"); contains(lower(1.response_text); \"don't need\"); contains(lower(1.response_text); \"won't be\"); contains(lower(1.response_text); \"not for us\"); contains(lower(1.response_text); \"hard pass\")); true; false)}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0,
+          "name": "Analyze Response — Detect Yes / No"
+        },
+        "expect": [
+          { "name": "response_lower", "type": "text", "label": "Response (lowercase)" },
+          { "name": "is_yes", "type": "boolean", "label": "Is Definitive YES?" },
+          { "name": "is_no", "type": "boolean", "label": "Is Definitive NO?" }
+        ],
+        "notes": "Keyword matching to detect definitive yes or no responses. If neither matches, the response is treated as undecided and follow-ups continue."
+      }
+    },
+    {
+      "id": 3,
+      "module": "google-sheets:filterRows",
+      "version": 4,
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "mapper": {
+        "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+        "sheetId": "LeadFollowUps",
+        "includesHeaders": true,
+        "filter": [
+          {
+            "column": "B",
+            "operator": "equals",
+            "value": "{{1.lead_email}}"
+          }
+        ],
+        "limit": 1
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0,
+          "name": "Find Lead in Google Sheet"
+        },
+        "restore": {
+          "parameters": {
+            "__IMTCONN__": {
+              "label": "Your Google Connection"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "__IMTCONN__",
+            "type": "account:google",
+            "label": "Connection",
+            "required": true
+          }
+        ],
+        "expect": [
+          { "name": "spreadsheetId", "type": "text", "label": "Spreadsheet ID", "required": true },
+          { "name": "sheetId", "type": "text", "label": "Sheet Name", "required": true }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0,
+          "name": "Route by Response Type"
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 10,
+              "module": "google-sheets:updateRow",
+              "version": 4,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+                "sheetId": "LeadFollowUps",
+                "rowNumber": "{{3.__ROW_NUMBER__}}",
+                "values": {
+                  "6": "won",
+                  "7": "",
+                  "9": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": -400,
+                  "name": "Mark Lead as WON"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Google Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:google",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": 11,
+              "module": "email:ActionSendEmail",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "to": "YOUR_EMAIL@example.com",
+                "subject": "LEAD WON — {{3.A}} said YES!",
+                "content": "<h2 style=\"color: green;\">Lead Accepted the Quote!</h2><p><strong>Lead:</strong> {{3.A}}</p><p><strong>Email:</strong> {{3.B}}</p><p><strong>Phone:</strong> {{if(3.C; 3.C; \"Not provided\")}}</p><p><strong>Quote Amount:</strong> {{if(3.D; 3.D; \"N/A\")}}</p><p><strong>Quote Date:</strong> {{3.F}}</p><p><strong>Their Response:</strong></p><blockquote>{{1.response_text}}</blockquote><hr><p><strong>Action required:</strong> Reach out to the lead to begin onboarding / service delivery.</p><p>Follow-up sequence has been <strong>stopped</strong>.</p>",
+                "ishtml": true
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1500,
+                  "y": -400,
+                  "name": "Notify Business — LEAD WON!"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Email Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:email",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ],
+                "expect": [
+                  { "name": "to", "type": "text", "label": "To Email", "required": true },
+                  { "name": "subject", "type": "text", "label": "Subject", "required": true },
+                  { "name": "content", "type": "text", "label": "Body (HTML)", "required": true }
+                ]
+              }
+            }
+          ],
+          "label": "YES — Lead Accepted",
+          "condition": {
+            "conditions": [
+              [
+                {
+                  "a": "{{2.is_yes}}",
+                  "b": "true",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "flow": [
+            {
+              "id": 20,
+              "module": "google-sheets:updateRow",
+              "version": 4,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+                "sheetId": "LeadFollowUps",
+                "rowNumber": "{{3.__ROW_NUMBER__}}",
+                "values": {
+                  "6": "lost",
+                  "7": "",
+                  "9": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": 0,
+                  "name": "Mark Lead as LOST"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Google Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:google",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": 21,
+              "module": "email:ActionSendEmail",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "to": "YOUR_EMAIL@example.com",
+                "subject": "Lead Declined — {{3.A}} said no",
+                "content": "<h3>Lead Declined the Quote</h3><p><strong>Lead:</strong> {{3.A}}</p><p><strong>Email:</strong> {{3.B}}</p><p><strong>Quote Amount:</strong> {{if(3.D; 3.D; \"N/A\")}}</p><p><strong>Quote Date:</strong> {{3.F}}</p><p><strong>Their Response:</strong></p><blockquote>{{1.response_text}}</blockquote><hr><p>Follow-up sequence has been <strong>stopped</strong>. Lead status set to <strong>lost</strong>.</p><p>Consider a personal follow-up in 30-60 days to re-engage.</p>",
+                "ishtml": true
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1500,
+                  "y": 0,
+                  "name": "Notify Business — Lead Declined"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Email Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:email",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ],
+                "expect": [
+                  { "name": "to", "type": "text", "label": "To Email", "required": true },
+                  { "name": "subject", "type": "text", "label": "Subject", "required": true },
+                  { "name": "content", "type": "text", "label": "Body (HTML)", "required": true }
+                ]
+              }
+            }
+          ],
+          "label": "NO — Lead Declined",
+          "condition": {
+            "conditions": [
+              [
+                {
+                  "a": "{{2.is_no}}",
+                  "b": "true",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "flow": [
+            {
+              "id": 30,
+              "module": "google-sheets:updateRow",
+              "version": 4,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+                "sheetId": "LeadFollowUps",
+                "rowNumber": "{{3.__ROW_NUMBER__}}",
+                "values": {
+                  "6": "pending",
+                  "7": "{{formatDate(addDays(now; 3); \"YYYY-MM-DD\")}}",
+                  "9": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": 400,
+                  "name": "Keep as Pending — Schedule Next Follow-Up"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Google Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:google",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ],
+                "notes": "Response was not a clear yes or no. Keep the lead as 'pending' and schedule the next follow-up in 3 days. The follow-up count is NOT reset — the sequence continues from where it left off."
+              }
+            },
+            {
+              "id": 31,
+              "module": "email:ActionSendEmail",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "to": "YOUR_EMAIL@example.com",
+                "subject": "Lead Replied (Undecided) — {{3.A}} — Manual Review Suggested",
+                "content": "<h3>Lead Replied — No Definitive Answer</h3><p><strong>Lead:</strong> {{3.A}}</p><p><strong>Email:</strong> {{3.B}}</p><p><strong>Phone:</strong> {{if(3.C; 3.C; \"Not provided\")}}</p><p><strong>Their Response:</strong></p><blockquote>{{1.response_text}}</blockquote><hr><p><strong>What happened:</strong> The response didn't contain a clear \"yes\" or \"no\". The follow-up sequence will <strong>continue</strong> — next follow-up scheduled in 3 days.</p><p><strong>Suggested action:</strong> Review the response above. If it's clearly a yes or no, you can manually update column G in the Google Sheet to <code>won</code> or <code>lost</code> to stop the sequence.</p>",
+                "ishtml": true
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1500,
+                  "y": 400,
+                  "name": "Notify Business — Undecided, Review Needed"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Email Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:email",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ],
+                "expect": [
+                  { "name": "to", "type": "text", "label": "To Email", "required": true },
+                  { "name": "subject", "type": "text", "label": "Subject", "required": true },
+                  { "name": "content", "type": "text", "label": "Body (HTML)", "required": true }
+                ]
+              }
+            }
+          ],
+          "label": "UNDECIDED — Continue Follow-Ups",
+          "condition": {
+            "conditions": [
+              [
+                {
+                  "a": "{{2.is_yes}}",
+                  "b": "false",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{2.is_no}}",
+                  "b": "false",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com",
+    "notes": "Lead Follow-Up Response Handler: Receives lead responses via webhook, analyzes the text for definitive yes/no keywords, and routes accordingly. YES → marks lead as 'won', stops follow-ups, notifies business. NO → marks lead as 'lost', stops follow-ups, notifies business. UNDECIDED → keeps lead as 'pending', schedules next follow-up in 3 days, notifies business for manual review. Works with the Intake and Scheduler scenarios."
+  }
+}

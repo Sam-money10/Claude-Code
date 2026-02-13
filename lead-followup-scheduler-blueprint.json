@@ -1,0 +1,586 @@
+{
+  "name": "Lead Follow-Up — Automated Scheduler (Runs Daily)",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-sheets:filterRows",
+      "version": 4,
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "mapper": {
+        "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+        "sheetId": "LeadFollowUps",
+        "includesHeaders": true,
+        "sortOrder": "asc",
+        "orderBy": "H",
+        "filter": [
+          {
+            "column": "G",
+            "operator": "equals",
+            "value": "pending"
+          }
+        ],
+        "limit": 100
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0,
+          "name": "Find Leads Needing Follow-Up"
+        },
+        "restore": {
+          "parameters": {
+            "__IMTCONN__": {
+              "label": "Your Google Connection"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "__IMTCONN__",
+            "type": "account:google",
+            "label": "Connection",
+            "required": true
+          }
+        ],
+        "expect": [
+          {
+            "name": "spreadsheetId",
+            "type": "text",
+            "label": "Spreadsheet ID",
+            "required": true
+          },
+          {
+            "name": "sheetId",
+            "type": "text",
+            "label": "Sheet Name",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicFilter",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "conditions": [
+          [
+            {
+              "a": "{{1.H}}",
+              "b": "{{formatDate(now; \"YYYY-MM-DD\")}}",
+              "o": "date:lessEqual"
+            }
+          ]
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0,
+          "name": "Filter: Follow-Up Date Reached"
+        },
+        "notes": "Only proceed if the lead's Next Follow-Up Date (column H) is today or earlier."
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0,
+          "name": "Route by Follow-Up Number"
+        },
+        "notes": "Routes to different follow-up messages based on how many times the lead has already been contacted. Each follow-up has a different tone — from gentle to direct."
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 10,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "email_subject": "Following up on your quote — {{if(1.K; 1.K; \"Our Company\")}}",
+                "email_body": "<p>Hi {{1.A}},</p><p>I wanted to follow up on the quote we sent over on <strong>{{1.F}}</strong>{{if(1.E; \" for \" + 1.E; \"\")}}{{if(1.D; \" (\" + 1.D + \")\"; \"\")}}.</p><p>I know things can get busy, so I just wanted to check in and see if you had any questions or if there's anything I can clarify about the proposal.</p><p>No rush at all — just let me know either way so I can keep things organized on my end.</p><p>Looking forward to hearing from you!</p><p>Best,<br>{{if(1.L; 1.L; \"The Team\")}}<br>{{if(1.K; 1.K; \"\")}}</p>",
+                "sms_body": "Hi {{1.A}}, just checking in on the quote we sent on {{1.F}}{{if(1.D; \" (\" + 1.D + \")\"; \"\")}}. Any questions? Let us know either way — happy to help! - {{if(1.L; 1.L; if(1.K; 1.K; \"Us\"))}}",
+                "next_followup_days": 3,
+                "followup_number": 1
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": -600,
+                  "name": "Prepare Follow-Up #1 — Gentle Check-In"
+                },
+                "expect": [
+                  { "name": "email_subject", "type": "text", "label": "Email Subject" },
+                  { "name": "email_body", "type": "text", "label": "Email Body (HTML)" },
+                  { "name": "sms_body", "type": "text", "label": "SMS Body" },
+                  { "name": "next_followup_days", "type": "number", "label": "Days Until Next Follow-Up" },
+                  { "name": "followup_number", "type": "number", "label": "Follow-Up Number" }
+                ]
+              }
+            }
+          ],
+          "label": "Follow-Up #1 — Gentle Check-In (Day 2)",
+          "condition": {
+            "conditions": [
+              [
+                {
+                  "a": "{{1.I}}",
+                  "b": "0",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "flow": [
+            {
+              "id": 11,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "email_subject": "Quick question about your quote — {{if(1.K; 1.K; \"Our Company\")}}",
+                "email_body": "<p>Hi {{1.A}},</p><p>I'm circling back on the quote we sent on <strong>{{1.F}}</strong>{{if(1.E; \" for \" + 1.E; \"\")}}{{if(1.D; \" (\" + 1.D + \")\"; \"\")}}.</p><p>I want to make sure the proposal fully meets your needs. If the pricing, scope, or timeline doesn't quite work, I'm happy to discuss adjustments.</p><p>A simple <strong>\"yes, let's do it\"</strong> or <strong>\"no, not right now\"</strong> works perfectly — I just want to make sure I'm not leaving you hanging.</p><p>Best,<br>{{if(1.L; 1.L; \"The Team\")}}<br>{{if(1.K; 1.K; \"\")}}</p>",
+                "sms_body": "Hi {{1.A}}, circling back on your quote from {{1.F}}. If anything needs adjusting (price, scope, timeline) I'm happy to chat. A quick yes or no works great — just want to make sure you're taken care of! - {{if(1.L; 1.L; if(1.K; 1.K; \"Us\"))}}",
+                "next_followup_days": 5,
+                "followup_number": 2
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": -300,
+                  "name": "Prepare Follow-Up #2 — Value & Flexibility"
+                },
+                "expect": [
+                  { "name": "email_subject", "type": "text", "label": "Email Subject" },
+                  { "name": "email_body", "type": "text", "label": "Email Body (HTML)" },
+                  { "name": "sms_body", "type": "text", "label": "SMS Body" },
+                  { "name": "next_followup_days", "type": "number", "label": "Days Until Next Follow-Up" },
+                  { "name": "followup_number", "type": "number", "label": "Follow-Up Number" }
+                ]
+              }
+            }
+          ],
+          "label": "Follow-Up #2 — Value & Flexibility (Day 5)",
+          "condition": {
+            "conditions": [
+              [
+                {
+                  "a": "{{1.I}}",
+                  "b": "1",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "flow": [
+            {
+              "id": 12,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "email_subject": "Still interested? — {{if(1.K; 1.K; \"Our Company\")}}",
+                "email_body": "<p>Hi {{1.A}},</p><p>I hope you're doing well. I've reached out a couple of times about the quote from <strong>{{1.F}}</strong>{{if(1.E; \" for \" + 1.E; \"\")}} and wanted to check in once more.</p><p>I completely understand if the timing isn't right or if you've decided to go a different direction — no hard feelings at all. But if you're still considering it, I'd love to answer any remaining questions.</p><p>Just a quick reply either way would be greatly appreciated so I know how to proceed.</p><p>Thanks,<br>{{if(1.L; 1.L; \"The Team\")}}<br>{{if(1.K; 1.K; \"\")}}</p>",
+                "sms_body": "Hi {{1.A}}, just wanted to touch base one more time about your quote. Totally understand if the timing isn't right — just let me know either way so I can update my records. Thanks! - {{if(1.L; 1.L; if(1.K; 1.K; \"Us\"))}}",
+                "next_followup_days": 7,
+                "followup_number": 3
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 0,
+                  "name": "Prepare Follow-Up #3 — Soft Nudge"
+                },
+                "expect": [
+                  { "name": "email_subject", "type": "text", "label": "Email Subject" },
+                  { "name": "email_body", "type": "text", "label": "Email Body (HTML)" },
+                  { "name": "sms_body", "type": "text", "label": "SMS Body" },
+                  { "name": "next_followup_days", "type": "number", "label": "Days Until Next Follow-Up" },
+                  { "name": "followup_number", "type": "number", "label": "Follow-Up Number" }
+                ]
+              }
+            }
+          ],
+          "label": "Follow-Up #3 — Soft Nudge (Day 10)",
+          "condition": {
+            "conditions": [
+              [
+                {
+                  "a": "{{1.I}}",
+                  "b": "2",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "flow": [
+            {
+              "id": 13,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "email_subject": "Your quote is expiring soon — {{if(1.K; 1.K; \"Our Company\")}}",
+                "email_body": "<p>Hi {{1.A}},</p><p>I wanted to give you a heads-up that the quote we sent on <strong>{{1.F}}</strong>{{if(1.E; \" for \" + 1.E; \"\")}}{{if(1.D; \" (\" + 1.D + \")\"; \"\")}} will be expiring soon.</p><p>If you'd like to move forward, now would be a great time to lock in the current pricing and availability. If it's a no for now, that's completely okay — I'd just appreciate a quick note so I can close out the file.</p><p>Either way, it's been great connecting with you.</p><p>Thanks,<br>{{if(1.L; 1.L; \"The Team\")}}<br>{{if(1.K; 1.K; \"\")}}</p>",
+                "sms_body": "Hi {{1.A}}, heads up — your quote from {{1.F}} will be expiring soon. Want to lock it in or pass for now? Either way just let me know! - {{if(1.L; 1.L; if(1.K; 1.K; \"Us\"))}}",
+                "next_followup_days": 8,
+                "followup_number": 4
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 300,
+                  "name": "Prepare Follow-Up #4 — Urgency / Expiring"
+                },
+                "expect": [
+                  { "name": "email_subject", "type": "text", "label": "Email Subject" },
+                  { "name": "email_body", "type": "text", "label": "Email Body (HTML)" },
+                  { "name": "sms_body", "type": "text", "label": "SMS Body" },
+                  { "name": "next_followup_days", "type": "number", "label": "Days Until Next Follow-Up" },
+                  { "name": "followup_number", "type": "number", "label": "Follow-Up Number" }
+                ]
+              }
+            }
+          ],
+          "label": "Follow-Up #4 — Urgency / Expiring (Day 17)",
+          "condition": {
+            "conditions": [
+              [
+                {
+                  "a": "{{1.I}}",
+                  "b": "3",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "flow": [
+            {
+              "id": 14,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "email_subject": "Closing the loop — {{if(1.K; 1.K; \"Our Company\")}}",
+                "email_body": "<p>Hi {{1.A}},</p><p>I've followed up a few times about the quote from <strong>{{1.F}}</strong> and I want to respect your time, so this will be my last follow-up on this one.</p><p>If you'd like to move forward in the future, my door is always open — just reply to this email anytime and we'll pick right back up.</p><p>Wishing you all the best!</p><p>Warm regards,<br>{{if(1.L; 1.L; \"The Team\")}}<br>{{if(1.K; 1.K; \"\")}}</p>",
+                "sms_body": "Hi {{1.A}}, this is my last follow-up on the quote from {{1.F}}. No worries at all if it's not the right time. If you ever want to revisit, just reach out — we're here! All the best. - {{if(1.L; 1.L; if(1.K; 1.K; \"Us\"))}}",
+                "next_followup_days": 0,
+                "followup_number": 5
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 600,
+                  "name": "Prepare Follow-Up #5 — Final / Break-Up"
+                },
+                "expect": [
+                  { "name": "email_subject", "type": "text", "label": "Email Subject" },
+                  { "name": "email_body", "type": "text", "label": "Email Body (HTML)" },
+                  { "name": "sms_body", "type": "text", "label": "SMS Body" },
+                  { "name": "next_followup_days", "type": "number", "label": "Days Until Next Follow-Up" },
+                  { "name": "followup_number", "type": "number", "label": "Follow-Up Number" }
+                ]
+              }
+            }
+          ],
+          "label": "Follow-Up #5 — Final Break-Up (Day 25)",
+          "condition": {
+            "conditions": [
+              [
+                {
+                  "a": "{{1.I}}",
+                  "b": "4",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "module": "builtin:BasicAggregator",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "email_subject": "{{10.email_subject}}{{11.email_subject}}{{12.email_subject}}{{13.email_subject}}{{14.email_subject}}",
+        "email_body": "{{10.email_body}}{{11.email_body}}{{12.email_body}}{{13.email_body}}{{14.email_body}}",
+        "sms_body": "{{10.sms_body}}{{11.sms_body}}{{12.sms_body}}{{13.sms_body}}{{14.sms_body}}",
+        "next_followup_days": "{{10.next_followup_days}}{{11.next_followup_days}}{{12.next_followup_days}}{{13.next_followup_days}}{{14.next_followup_days}}",
+        "followup_number": "{{10.followup_number}}{{11.followup_number}}{{12.followup_number}}{{13.followup_number}}{{14.followup_number}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1200,
+          "y": 0,
+          "name": "Merge Follow-Up Data"
+        },
+        "notes": "Merges the output from whichever route was taken so subsequent modules can reference a single set of variables."
+      }
+    },
+    {
+      "id": 21,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 1500,
+          "y": 0,
+          "name": "Send Follow-Up Messages"
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 30,
+              "module": "email:ActionSendEmail",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "to": "{{1.B}}",
+                "subject": "{{20.email_subject}}",
+                "content": "{{20.email_body}}",
+                "ishtml": true,
+                "replyTo": "{{if(1.M; 1.M; \"\")}}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": -200,
+                  "name": "Send Follow-Up Email to Lead"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Email Connection (SMTP or Gmail)"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:email",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ],
+                "expect": [
+                  { "name": "to", "type": "text", "label": "To (Lead Email)", "required": true },
+                  { "name": "subject", "type": "text", "label": "Subject", "required": true },
+                  { "name": "content", "type": "text", "label": "Body (HTML)", "required": true },
+                  { "name": "replyTo", "type": "text", "label": "Reply-To" }
+                ]
+              }
+            }
+          ],
+          "label": "Send Email Follow-Up"
+        },
+        {
+          "flow": [
+            {
+              "id": 31,
+              "module": "twilio:sendSMS",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "from": "YOUR_TWILIO_PHONE_NUMBER",
+                "to": "{{1.C}}",
+                "body": "{{20.sms_body}}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1800,
+                  "y": 200,
+                  "name": "Send Follow-Up SMS to Lead (Optional)"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Twilio Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:twilio",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ],
+                "expect": [
+                  { "name": "from", "type": "text", "label": "From (Twilio Number)", "required": true },
+                  { "name": "to", "type": "text", "label": "To (Lead Phone)", "required": true },
+                  { "name": "body", "type": "text", "label": "Message Body", "required": true }
+                ]
+              }
+            }
+          ],
+          "label": "Send SMS Follow-Up (if phone exists)",
+          "condition": {
+            "conditions": [
+              [
+                {
+                  "a": "{{1.C}}",
+                  "b": "",
+                  "o": "text:notEqual"
+                }
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "module": "google-sheets:updateRow",
+      "version": 4,
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "mapper": {
+        "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+        "sheetId": "LeadFollowUps",
+        "rowNumber": "{{1.__ROW_NUMBER__}}",
+        "values": {
+          "6": "{{if(20.followup_number = 5; \"no_response\"; \"pending\")}}",
+          "7": "{{if(20.next_followup_days > 0; formatDate(addDays(now; 20.next_followup_days); \"YYYY-MM-DD\"); \"\")}}",
+          "8": "{{20.followup_number}}",
+          "9": "{{formatDate(now; \"YYYY-MM-DD\")}}"
+        }
+      },
+      "metadata": {
+        "designer": {
+          "x": 2100,
+          "y": 0,
+          "name": "Update Lead — Increment Follow-Up Count"
+        },
+        "restore": {
+          "parameters": {
+            "__IMTCONN__": {
+              "label": "Your Google Connection"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "__IMTCONN__",
+            "type": "account:google",
+            "label": "Connection",
+            "required": true
+          }
+        ],
+        "expect": [
+          { "name": "spreadsheetId", "type": "text", "label": "Spreadsheet ID", "required": true },
+          { "name": "sheetId", "type": "text", "label": "Sheet Name", "required": true },
+          { "name": "rowNumber", "type": "text", "label": "Row Number", "required": true },
+          {
+            "name": "values",
+            "type": "collection",
+            "label": "Updated Values",
+            "spec": [
+              { "name": "6", "label": "G: Status", "type": "text" },
+              { "name": "7", "label": "H: Next Follow-Up Date", "type": "text" },
+              { "name": "8", "label": "I: Follow-Up Count", "type": "text" },
+              { "name": "9", "label": "J: Last Follow-Up Date", "type": "text" }
+            ]
+          }
+        ],
+        "notes": "Updates the lead's row: increments follow-up count, sets next follow-up date, updates last follow-up date. If this was follow-up #5 (final), status changes to 'no_response' and no further follow-ups are scheduled."
+      }
+    },
+    {
+      "id": 50,
+      "module": "email:ActionSendEmail",
+      "version": 3,
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "mapper": {
+        "to": "YOUR_EMAIL@example.com",
+        "subject": "Follow-Up #{{20.followup_number}} Sent — {{1.A}}{{if(20.followup_number = 5; \" (FINAL — Sequence Complete)\"; \"\")}}",
+        "content": "<h3>Follow-Up Report</h3><p><strong>Lead:</strong> {{1.A}} ({{1.B}})</p><p><strong>Quote Date:</strong> {{1.F}}</p><p><strong>Follow-Up #:</strong> {{20.followup_number}} of 5</p><p><strong>Status:</strong> {{if(20.followup_number = 5; \"Sequence complete — marked as no_response\"; \"Next follow-up in \" + 20.next_followup_days + \" days\")}}</p><hr>{{if(20.followup_number = 5; \"<p><strong>Action needed:</strong> This lead has gone through all 5 automated follow-ups without a response. Consider a personal phone call or removing from active pipeline.</p>\"; \"<p>No action needed — the next follow-up is scheduled automatically.</p>\")}}",
+        "ishtml": true
+      },
+      "metadata": {
+        "designer": {
+          "x": 2400,
+          "y": 0,
+          "name": "Notify Business — Follow-Up Sent"
+        },
+        "restore": {
+          "parameters": {
+            "__IMTCONN__": {
+              "label": "Your Email Connection"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "__IMTCONN__",
+            "type": "account:email",
+            "label": "Connection",
+            "required": true
+          }
+        ],
+        "expect": [
+          { "name": "to", "type": "text", "label": "To Email", "required": true },
+          { "name": "subject", "type": "text", "label": "Subject", "required": true },
+          { "name": "content", "type": "text", "label": "Body (HTML)", "required": true }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com",
+    "scheduling": {
+      "type": "indefinitely",
+      "interval": 86400,
+      "time": "09:00"
+    },
+    "notes": "Lead Follow-Up Scheduler: Runs daily at 9 AM. Searches Google Sheets for leads with status 'pending' whose follow-up date has arrived. Sends escalating follow-up emails (and optional SMS) on a 5-touch cadence: Day 2 (gentle), Day 5 (value), Day 10 (nudge), Day 17 (urgency), Day 25 (final break-up). After the 5th follow-up, the lead is marked 'no_response'. The business owner receives a notification after each follow-up. Works with the Intake and Response Handler scenarios."
+  }
+}

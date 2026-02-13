@@ -1,0 +1,269 @@
+{
+  "name": "Lead Follow-Up — Quote Sent Intake",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": null,
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "restore": {
+          "parameters": {
+            "hook": {
+              "label": "Quote Sent Webhook (fire this when your business sends a quote)"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "hook",
+            "type": "hook:gateway-webhook",
+            "label": "Webhook",
+            "required": true
+          },
+          {
+            "name": "maxResults",
+            "type": "number",
+            "label": "Maximum number of results"
+          }
+        ],
+        "expect": [
+          {
+            "name": "lead_name",
+            "type": "text",
+            "label": "Lead Name",
+            "required": true
+          },
+          {
+            "name": "lead_email",
+            "type": "text",
+            "label": "Lead Email",
+            "required": true
+          },
+          {
+            "name": "lead_phone",
+            "type": "text",
+            "label": "Lead Phone Number"
+          },
+          {
+            "name": "quote_amount",
+            "type": "text",
+            "label": "Quote Amount"
+          },
+          {
+            "name": "quote_description",
+            "type": "text",
+            "label": "Quote / Service Description"
+          },
+          {
+            "name": "business_name",
+            "type": "text",
+            "label": "Your Business Name"
+          },
+          {
+            "name": "sender_name",
+            "type": "text",
+            "label": "Sender Name (sales rep / owner)"
+          },
+          {
+            "name": "sender_email",
+            "type": "text",
+            "label": "Sender Email (for reply-to)"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 3,
+              "module": "google-sheets:addRow",
+              "version": 4,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+                "sheetId": "LeadFollowUps",
+                "values": {
+                  "0": "{{1.lead_name}}",
+                  "1": "{{1.lead_email}}",
+                  "2": "{{if(1.lead_phone; 1.lead_phone; \"\")}}",
+                  "3": "{{if(1.quote_amount; 1.quote_amount; \"Not specified\")}}",
+                  "4": "{{if(1.quote_description; 1.quote_description; \"\")}}",
+                  "5": "{{formatDate(now; \"YYYY-MM-DD\")}}",
+                  "6": "pending",
+                  "7": "{{formatDate(addDays(now; 2); \"YYYY-MM-DD\")}}",
+                  "8": "0",
+                  "9": "{{formatDate(now; \"YYYY-MM-DD\")}}",
+                  "10": "{{if(1.business_name; 1.business_name; \"Our Company\")}}",
+                  "11": "{{if(1.sender_name; 1.sender_name; \"\")}}",
+                  "12": "{{if(1.sender_email; 1.sender_email; \"\")}}"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": -200,
+                  "name": "Log Lead to Follow-Up Sheet"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Google Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:google",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ],
+                "expect": [
+                  {
+                    "name": "spreadsheetId",
+                    "type": "text",
+                    "label": "Spreadsheet ID",
+                    "required": true
+                  },
+                  {
+                    "name": "sheetId",
+                    "type": "text",
+                    "label": "Sheet Name",
+                    "required": true
+                  },
+                  {
+                    "name": "values",
+                    "type": "collection",
+                    "label": "Row Values",
+                    "spec": [
+                      { "name": "0", "label": "A: Lead Name", "type": "text" },
+                      { "name": "1", "label": "B: Lead Email", "type": "text" },
+                      { "name": "2", "label": "C: Lead Phone", "type": "text" },
+                      { "name": "3", "label": "D: Quote Amount", "type": "text" },
+                      { "name": "4", "label": "E: Quote Description", "type": "text" },
+                      { "name": "5", "label": "F: Quote Date", "type": "text" },
+                      { "name": "6", "label": "G: Status", "type": "text" },
+                      { "name": "7", "label": "H: Next Follow-Up Date", "type": "text" },
+                      { "name": "8", "label": "I: Follow-Up Count", "type": "text" },
+                      { "name": "9", "label": "J: Last Follow-Up Date", "type": "text" },
+                      { "name": "10", "label": "K: Business Name", "type": "text" },
+                      { "name": "11", "label": "L: Sender Name", "type": "text" },
+                      { "name": "12", "label": "M: Sender Email", "type": "text" }
+                    ]
+                  }
+                ]
+              }
+            }
+          ],
+          "label": "Log Lead to Google Sheet"
+        },
+        {
+          "flow": [
+            {
+              "id": 4,
+              "module": "email:ActionSendEmail",
+              "version": 3,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "to": "YOUR_EMAIL@example.com",
+                "subject": "New Quote Sent — Follow-Up Tracking Active: {{1.lead_name}}",
+                "content": "<h3>Quote Follow-Up Tracking Started</h3><p><strong>Lead:</strong> {{1.lead_name}}</p><p><strong>Email:</strong> {{1.lead_email}}</p><p><strong>Phone:</strong> {{if(1.lead_phone; 1.lead_phone; \"Not provided\")}}</p><p><strong>Quote Amount:</strong> {{if(1.quote_amount; 1.quote_amount; \"Not specified\")}}</p><p><strong>Description:</strong> {{if(1.quote_description; 1.quote_description; \"N/A\")}}</p><p><strong>Quote Date:</strong> {{formatDate(now; \"MMMM DD, YYYY\")}}</p><hr><p>Automated follow-up sequence has been activated. The first follow-up will be sent in <strong>2 days</strong> if the lead doesn't respond with a definitive yes or no.</p><p><strong>Follow-up cadence:</strong> Day 2 → Day 5 → Day 10 → Day 17 → Day 25 (final)</p>",
+                "ishtml": true
+              },
+              "metadata": {
+                "designer": {
+                  "x": 600,
+                  "y": 200,
+                  "name": "Notify Business — Tracking Active"
+                },
+                "restore": {
+                  "parameters": {
+                    "__IMTCONN__": {
+                      "label": "Your Email Connection"
+                    }
+                  }
+                },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:email",
+                    "label": "Connection",
+                    "required": true
+                  }
+                ],
+                "expect": [
+                  {
+                    "name": "to",
+                    "type": "text",
+                    "label": "To Email",
+                    "required": true
+                  },
+                  {
+                    "name": "subject",
+                    "type": "text",
+                    "label": "Subject",
+                    "required": true
+                  },
+                  {
+                    "name": "content",
+                    "type": "text",
+                    "label": "Body (HTML)",
+                    "required": true
+                  }
+                ]
+              }
+            }
+          ],
+          "label": "Notify Business Owner"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com",
+    "notes": "Lead Follow-Up Intake: Fires when a quote is sent to a lead. Logs the lead to Google Sheets with follow-up scheduling and notifies the business owner that automated follow-up tracking is now active. Works with the Follow-Up Scheduler and Response Handler scenarios."
+  }
+}
